@@ -1,26 +1,35 @@
-# uvの使い方詳細ガイド
+# uvの使い方ガイド
 
 ## 目次
 1. [uvとは](#uvとは)
 2. [インストール](#インストール)
-3. [プロジェクト管理](#プロジェクト管理)
-4. [パッケージ管理](#パッケージ管理)
-5. [仮想環境管理](#仮想環境管理)
-6. [ツール管理](#ツール管理)
-7. [Pythonバージョン管理](#pythonバージョン管理)
-8. [よく使うコマンド一覧](#よく使うコマンド一覧)
+3. [基本的な使い方](#基本的な使い方)
+4. [プロジェクト管理](#プロジェクト管理)
+5. [ツール管理](#ツール管理)
+6. [Jupyter Notebookとの連携](#jupyter-notebookとの連携)
+7. [チーム開発での運用](#チーム開発での運用)
+8. [pipとの対応表](#pipとの対応表)
+9. [トラブルシューティング](#トラブルシューティング)
 
 ---
 
 ## uvとは
 
-`uv`は、Astral社が開発したRust製の超高速Pythonパッケージマネージャーです。
+`uv`は、Rustで書かれた超高速Python パッケージマネージャーです。
 
-### 主な特徴
-- **高速**: pipの10-100倍の速度
-- **オールインワン**: パッケージ管理、仮想環境、Pythonバージョン管理を統合
-- **pip互換**: 既存のpipコマンドと互換性あり
-- **モダンな依存関係解決**: `pyproject.toml`と`uv.lock`を使用
+### メリット
+- ⚡ **速度**: pip/poetryより10〜100倍速い
+- 🎯 **オールインワン**: Pythonバージョン管理、仮想環境、パッケージ管理が1つのツールで完結
+- 🔒 **再現性**: `uv.lock`で完全な環境再現
+- 📦 **pip互換**: 既存のpipコマンドがそのまま使える
+- 💾 **キャッシュ**: 一度DLしたパッケージは再利用
+
+### 置き換えるツール
+```
+pyenv + venv + pip + pip-tools + poetry
+        ↓
+       uv だけ！
+```
 
 ---
 
@@ -28,22 +37,110 @@
 
 ### Linux/macOS
 ```bash
+# 公式インストーラー（推奨）
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# または pip経由（推奨されない）
+pip install uv
 ```
 
 ### Windows
 ```powershell
+# PowerShellで実行
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
 
-### pipを使用（推奨されない）
-```bash
+# または pip経由（推奨されない）
 pip install uv
 ```
 
-### インストール確認
+### バージョン確認
 ```bash
 uv --version
+```
+
+### アンインストール
+
+```bash
+# Linux/macOS
+rm ~/.cargo/bin/uv
+
+# Windows
+# インストーラーでインストールした場合は、PATHから削除
+```
+
+---
+
+## 基本的な使い方
+
+### 1. Pythonのインストール
+
+```bash
+# 利用可能なPythonバージョンを確認
+uv python list
+
+# Python 3.11.0をインストール
+uv python install 3.11.0
+
+# 複数バージョンをインストール
+uv python install 3.11.0 3.12.0
+
+# インストール済みPythonを確認
+uv python list --only-installed
+```
+
+### 2. 仮想環境の作成
+
+```bash
+# デフォルトのPythonで仮想環境を作成
+uv venv
+
+# Pythonバージョンを指定
+uv venv --python 3.11.0
+
+# 別の場所に作成
+uv venv --python 3.11.0 my_env
+
+# 仮想環境を有効化
+source .venv/bin/activate
+
+# 無効化
+deactivate
+```
+
+### 3. パッケージのインストール
+
+```bash
+# 単一パッケージをインストール
+uv pip install pandas
+
+# 複数パッケージ
+uv pip install pandas numpy requests
+
+# バージョン指定
+uv pip install pandas==2.3.2
+uv pip install "pandas>=2.0,<3.0"
+
+# requirements.txtから
+uv pip install -r requirements.txt
+
+# アップグレード
+uv pip install --upgrade pandas
+
+# アンインストール
+uv pip uninstall pandas
+```
+
+### 4. パッケージ一覧
+
+```bash
+# インストール済みパッケージを表示
+uv pip list
+
+# requirements.txt形式で出力
+uv pip freeze > requirements.txt
+
+# 特定パッケージの情報
+uv pip show pandas
 ```
 
 ---
@@ -51,172 +148,102 @@ uv --version
 ## プロジェクト管理
 
 ### 新規プロジェクトの作成
+
 ```bash
-# 空のプロジェクトを作成
+# プロジェクト初期化
 uv init my-project
+cd my-project
 
-# アプリケーションプロジェクトを作成
-uv init my-project --app
+# または既存ディレクトリで
+cd existing-project
+uv init
 
-# ライブラリプロジェクトを作成
-uv init my-project --lib
+# これで pyproject.toml が作成される
 ```
 
-生成されるファイル構造:
-```
-my-project/
-├── pyproject.toml      # プロジェクト設定
-├── README.md
-├── .python-version     # Pythonバージョン指定
-└── src/
-    └── my_project/
-        └── __init__.py
-```
+### pyproject.toml を使った管理
 
-### プロジェクトへの依存パッケージ追加
+#### パッケージの追加
+
 ```bash
-# 通常の依存パッケージを追加
-uv add requests
+# 本番用パッケージを追加
+uv add pandas numpy
 
-# 開発用依存パッケージを追加
+# 開発用パッケージを追加
 uv add --dev pytest black ruff
 
-# バージョン指定して追加
-uv add "django>=4.2,<5.0"
+# オプショナルグループを指定
+uv add --group docs sphinx
 
-# 複数パッケージを一度に追加
-uv add numpy pandas matplotlib
+# pyproject.tomlとuv.lockが自動更新される
 ```
 
-### パッケージの削除
-```bash
-uv remove requests
+#### パッケージの削除
 
-# 開発依存から削除
+```bash
+# パッケージを削除
+uv remove pandas
+
+# 開発用パッケージを削除
 uv remove --dev pytest
 ```
 
-### 依存関係のロック
+#### インストール（同期）
+
 ```bash
-# uv.lockファイルを生成・更新
+# pyproject.tomlとuv.lockに基づいてインストール
+uv sync
+
+# 開発用依存関係も含む
+uv sync --all-extras
+
+# 本番用のみ（開発用を除外）
+uv sync --no-dev
+```
+
+### requirements.txt からの移行
+
+```bash
+# 既存のrequirements.txtがある場合
+
+# 方法1: requirements.txtからpyproject.tomlに変換
+uv init
+uv add --requirements requirements.txt
+
+# 方法2: 直接インストール（pyproject.tomlなし）
+uv venv
+uv pip install -r requirements.txt
+```
+
+### ロックファイル
+
+```bash
+# 依存関係を解決してuv.lockを生成/更新
 uv lock
 
-# ロックファイルを使ってインストール
-uv sync
+# ロックファイルを更新（最新版に）
+uv lock --upgrade
+
+# 特定パッケージのみ更新
+uv lock --upgrade-package pandas
 ```
+
+---
+
+## プロジェクトの実行
 
 ### スクリプト実行
+
 ```bash
-# プロジェクト環境でPythonスクリプトを実行
+# uv run を使うと仮想環境を自動認識
 uv run python script.py
 
-# プロジェクト環境でコマンドを実行
-uv run pytest
+# モジュールとして実行
+uv run python -m mymodule
 
-# 一時的にパッケージを追加して実行
-uv run --with requests python script.py
-```
-
----
-
-## パッケージ管理
-
-### パッケージのインストール
-```bash
-# 単一パッケージをインストール
-uv pip install requests
-
-# バージョン指定してインストール
-uv pip install "django==4.2.0"
-uv pip install "numpy>=1.20,<2.0"
-
-# requirements.txtからインストール
-uv pip install -r requirements.txt
-
-# 編集可能モードでローカルパッケージをインストール
-uv pip install -e .
-uv pip install -e ./path/to/package
-```
-
-### パッケージのアップグレード
-```bash
-# 特定パッケージをアップグレード
-uv pip install --upgrade requests
-
-# すべてのパッケージをアップグレード
-uv pip install --upgrade-package requests
-```
-
-### パッケージのアンインストール
-```bash
-uv pip uninstall requests
-
-# 複数パッケージを一度にアンインストール
-uv pip uninstall requests numpy pandas
-```
-
-### インストール済みパッケージの確認
-```bash
-# パッケージ一覧を表示
-uv pip list
-
-# フリーズ形式で出力（requirements.txt用）
-uv pip freeze
-
-# requirements.txtに保存
-uv pip freeze > requirements.txt
-
-# 特定パッケージの情報を表示
-uv pip show requests
-```
-
-### パッケージの検索
-```bash
-# PyPIでパッケージを検索
-uv pip search django
-```
-
----
-
-## 仮想環境管理
-
-### 仮想環境の作成
-```bash
-# デフォルトの仮想環境を作成（.venv）
-uv venv
-
-# 名前を指定して作成
-uv venv myenv
-
-# 特定のPythonバージョンで作成
-uv venv --python 3.11
-uv venv --python 3.12.0
-
-# システムのパッケージにアクセスできる環境を作成
-uv venv --system-site-packages
-```
-
-### 仮想環境の有効化
-```bash
-# Linux/macOS
+# アクティベートしてから実行（従来の方法）
 source .venv/bin/activate
-
-# Windows（PowerShell）
-.venv\Scripts\Activate.ps1
-
-# Windows（cmd）
-.venv\Scripts\activate.bat
-```
-
-### 仮想環境の無効化
-```bash
-deactivate
-```
-
-### 仮想環境の削除
-```bash
-# 仮想環境ディレクトリを削除
-rm -rf .venv
+python script.py
 ```
 
 ---
@@ -224,8 +251,10 @@ rm -rf .venv
 ## ツール管理
 
 uvは、CLIツール（black、ruff、pytestなど）を隔離された環境で管理できます。
+プロジェクトの依存関係と分離してグローバルに使えるツールを管理できる強力な機能です。
 
 ### ツールのインストール
+
 ```bash
 # ツールをグローバルにインストール
 uv tool install ruff
@@ -238,6 +267,7 @@ uv tool install jupyter --with numpy --with pandas
 ```
 
 ### ツールの実行
+
 ```bash
 # インストール済みツールを実行
 ruff check .
@@ -245,10 +275,19 @@ black .
 
 # インストールせずに一時的に実行（uvx）
 uvx ruff check .
+uvx black .
+
+# パッケージを一時的に追加して実行
 uvx --with numpy python -c "import numpy; print(numpy.__version__)"
 ```
 
+**`uvx`の利点**:
+- インストール不要で即実行
+- 一度だけ使いたいツールに最適
+- 実行後は環境を汚さない
+
 ### ツールのアップグレード
+
 ```bash
 # 特定のツールをアップグレード
 uv tool upgrade ruff
@@ -261,14 +300,29 @@ uv tool upgrade ruff --reinstall
 
 # 特定の依存パッケージのみアップグレード
 uv tool upgrade jupyter --upgrade-package numpy
+
+# Pythonバージョンを指定してアップグレード
+uv tool upgrade ruff --python 3.12
 ```
+
+**主なオプション**:
+- `--all`: インストール済みすべてのツールをアップグレード
+- `--reinstall`: ツール環境にインストールされている全パッケージを再インストール
+- `--upgrade-package <パッケージ名>`: 特定の依存パッケージをアップグレード
+- `--python <バージョン>`: 使用するPythonバージョンを指定
 
 ### ツールのアンインストール
+
 ```bash
+# ツールをアンインストール
 uv tool uninstall ruff
+
+# 複数のツールを一度にアンインストール
+uv tool uninstall ruff black pytest
 ```
 
-### インストール済みツールの一覧
+### インストール済みツールの確認
+
 ```bash
 # ツール一覧を表示
 uv tool list
@@ -280,100 +334,178 @@ uv tool dir
 uv tool dir --bin
 ```
 
----
+**ツールのインストール先**:
+- Linux/macOS: `~/.local/share/uv/tools`
+- Windows: `~\AppData\Roaming\uv\data\tools`
+- 環境変数`UV_TOOL_DIR`で変更可能
 
-## Pythonバージョン管理
+### よく使うツールの例
 
-uvは、Pythonのバージョン管理も統合しています（pyenvの代替）。
-
-### Pythonバージョンのインストール
 ```bash
-# 最新バージョンをインストール
-uv python install
+# Linter/Formatter
+uv tool install ruff
+uv tool install black
+uv tool install isort
 
-# 特定のバージョンをインストール
-uv python install 3.12
-uv python install 3.11.5
+# テスト
+uv tool install pytest
+uv tool install tox
 
-# 複数バージョンをインストール
-uv python install 3.11 3.12
-```
+# Jupyter
+uv tool install jupyter
 
-### インストール済みPythonの一覧
-```bash
-uv python list
-```
-
-### プロジェクトで使用するPythonバージョンの指定
-```bash
-# .python-versionファイルを作成
-uv python pin 3.12
-
-# または手動で作成
-echo "3.12" > .python-version
-```
-
-### Pythonバージョンの確認
-```bash
-# 現在のPythonバージョンを確認
-uv python find
+# その他
+uv tool install pipx
+uv tool install cookiecutter
 ```
 
 ---
 
-## よく使うコマンド一覧
+## Jupyter Notebookとの連携
 
-### プロジェクトのセットアップ（新規）
+### セットアップ
+
 ```bash
-# プロジェクト作成から実行まで
-uv init my-project
-cd my-project
-uv add requests pytest
-uv run python -c "import requests; print(requests.__version__)"
+# Jupyterをインストール（開発用依存関係として）
+uv add --dev ipykernel jupyter
+
+# または既にrequirements.txtに含まれている場合
+uv pip install -r requirements.txt
+
+# Jupyter Kernelとして登録
+source .venv/bin/activate
+python -m ipykernel install --user --name=my-project --display-name "Python (my-project)"
 ```
 
-### プロジェクトのセットアップ（既存）
+### Jupyter起動
+
 ```bash
-# クローン後の環境構築
-git clone <repository>
-cd <project>
-uv sync                    # 依存関係をインストール
-uv run pytest              # テストを実行
+# 方法1: アクティベートしてから
+source .venv/bin/activate
+jupyter notebook
+
+# 方法2: uv runを使う
+uv run jupyter notebook
 ```
 
-### 日常的な開発フロー
+### Notebookでの使用
+
+1. Jupyter Notebookを開く
+2. **Kernel** → **Change kernel**
+3. 登録したkernel（例: "Python (my-project)"）を選択
+
+### カーネルの確認・削除
+
 ```bash
-# パッケージを追加
-uv add numpy
+# インストール済みkernelを確認
+jupyter kernelspec list
 
-# スクリプトを実行
-uv run python main.py
-
-# テストを実行
-uv run pytest
-
-# リンターを実行
-uv run ruff check .
-
-# フォーマッターを実行
-uv run black .
-```
-
-### 依存関係の更新
-```bash
-# ロックファイルを更新
-uv lock --upgrade
-
-# 特定パッケージのみ更新
-uv lock --upgrade-package requests
-
-# インストールまで一括実行
-uv sync --upgrade
+# kernelを削除
+jupyter kernelspec remove my-project
 ```
 
 ---
 
-## pyproject.toml の例
+## チーム開発での運用
+
+### 初回セットアップ（新規メンバー）
+
+```bash
+# 1. リポジトリをクローン
+git clone <repository-url>
+cd project
+
+# 2. 環境を完全再現
+uv sync
+
+# これだけ！
+# - Pythonがなければ自動ダウンロード
+# - .venv/が作成される
+# - uv.lockに基づいて完全一致する環境が構築される
+```
+
+### 開発フロー
+
+#### パッケージを追加する場合
+
+```bash
+# 1. パッケージを追加
+uv add requests
+
+# 2. 自動で更新されるファイル
+# - pyproject.toml
+# - uv.lock
+
+# 3. コミット
+git add pyproject.toml uv.lock
+git commit -m "Add requests package"
+git push
+```
+
+#### 他のメンバーが追加したパッケージを取得
+
+```bash
+# 1. 最新を取得
+git pull
+
+# 2. 環境を同期
+uv sync
+
+# これで新しいパッケージが自動でインストールされる
+```
+
+### .gitignore に追加すべきもの
+
+```gitignore
+# Python仮想環境
+.venv/
+venv/
+env/
+
+# uvのキャッシュ（オプション、通常は共有しない）
+.uv_cache/
+
+# pyproject.tomlとuv.lockは必ずコミットする（除外しない）
+```
+
+---
+
+## pipとの対応表
+
+uvは、pipのコマンドとほぼ互換性があります。既存のpipコマンドに`uv`を追加するだけで使えます。
+
+| pip | uv | 説明 |
+|-----|-----|------|
+| `pip install package` | `uv pip install package` | パッケージをインストール |
+| `pip install -r requirements.txt` | `uv pip install -r requirements.txt` | requirements.txtからインストール |
+| `pip install -e .` | `uv pip install -e .` | 編集可能モードでインストール |
+| `pip install --upgrade package` | `uv pip install --upgrade package` | パッケージをアップグレード |
+| `pip uninstall package` | `uv pip uninstall package` | パッケージをアンインストール |
+| `pip list` | `uv pip list` | インストール済みパッケージ一覧 |
+| `pip freeze` | `uv pip freeze` | requirements.txt形式で出力 |
+| `pip show package` | `uv pip show package` | パッケージ情報を表示 |
+| `python -m venv .venv` | `uv venv` | 仮想環境を作成 |
+| `pip search package` | `uv pip search package` | パッケージを検索 |
+
+### uvにしかない便利なコマンド
+
+| コマンド | 説明 |
+|---------|------|
+| `uv init` | プロジェクトを初期化 |
+| `uv add package` | pyproject.tomlにパッケージを追加 |
+| `uv remove package` | pyproject.tomlからパッケージを削除 |
+| `uv sync` | pyproject.toml/uv.lockから環境を同期 |
+| `uv lock` | 依存関係をロック |
+| `uv run command` | プロジェクト環境でコマンドを実行 |
+| `uv tool install tool` | グローバルツールをインストール |
+| `uvx tool` | ツールを一時的に実行 |
+| `uv python install 3.12` | Pythonバージョンをインストール |
+
+---
+
+## pyproject.toml の構造
+
+### 基本構造
 
 ```toml
 [project]
@@ -382,49 +514,259 @@ version = "0.1.0"
 description = "プロジェクトの説明"
 readme = "README.md"
 requires-python = ">=3.11"
+
+# 本番環境で必要なパッケージ
 dependencies = [
+    "pandas>=2.3.0",
+    "numpy>=1.26.0",
     "requests>=2.31.0",
-    "numpy>=1.24.0",
 ]
 
+# 開発環境でのみ必要なパッケージ
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
+    "ipykernel>=6.25.0",
+    "jupyter>=1.0.0",
 ]
 
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+
+docs = [
+    "sphinx>=7.0.0",
+]
+
+# ビルドシステム
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
-    "pytest>=7.4.0",
-    "black>=23.0.0",
-]
+# ツール設定（オプション）
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+select = ["E", "F"]
+line-length = 88
+```
+
+### インストール方法の違い
+
+```bash
+# 本番用のみ
+uv pip install .
+
+# 本番用 + 開発用
+uv pip install -e ".[dev]"
+
+# 本番用 + テスト用
+uv pip install -e ".[test]"
+
+# 全て
+uv pip install -e ".[dev,test,docs]"
+
+# または uv sync
+uv sync                  # 本番用のみ
+uv sync --all-extras     # 全てのオプション含む
 ```
 
 ---
 
-## pipとの対応表
+## 便利なコマンド集
 
-| pip | uv |
-|-----|-----|
-| `pip install package` | `uv pip install package` |
-| `pip install -r requirements.txt` | `uv pip install -r requirements.txt` |
-| `pip uninstall package` | `uv pip uninstall package` |
-| `pip list` | `uv pip list` |
-| `pip freeze` | `uv pip freeze` |
-| `pip show package` | `uv pip show package` |
-| `python -m venv .venv` | `uv venv` |
-| `pip install -e .` | `uv pip install -e .` |
+### 環境情報
+
+```bash
+# uvのバージョン
+uv --version
+
+# システム情報を表示（詳細）
+uv version --verbose
+
+# Python環境の確認
+uv python list --only-installed
+
+# 利用可能なすべてのPythonバージョン
+uv python list
+
+# 現在のPythonバージョンを確認
+uv python find
+
+# 現在のPythonパス
+uv run python -c "import sys; print(sys.executable)"
+
+# uvの設定を表示
+uv config
+```
+
+### パッケージ管理
+
+```bash
+# 依存関係のツリー表示
+uv pip list --format=tree
+
+# 古いパッケージを確認
+uv pip list --outdated
+
+# 依存関係の検証
+uv lock --check
+
+# キャッシュをクリア
+uv cache clean
+
+# 特定パッケージのキャッシュをクリア
+uv cache clean requests
+
+# キャッシュサイズを確認
+du -sh ~/.cache/uv
+```
+
+---
+
+## よくある使用パターン
+
+### パターン1: 既存プロジェクト（requirements.txtのみ）
+
+```bash
+# プロジェクトをクローン
+git clone <repo>
+cd project
+
+# uvで仮想環境を作成してインストール
+uv venv --python 3.11.0
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# 必要に応じてJupyter kernel登録
+python -m ipykernel install --user --name=project
+```
+
+### パターン2: pyproject.toml + uv.lock があるプロジェクト
+
+```bash
+# プロジェクトをクローン
+git clone <repo>
+cd project
+
+# これだけで完全再現
+uv sync
+```
+
+### パターン3: 新規プロジェクト作成
+
+```bash
+# プロジェクト作成
+uv init my-project
+cd my-project
+
+# パッケージを追加
+uv add pandas numpy
+uv add --dev pytest jupyter
+
+# 開発開始
+uv run python main.py
+```
+
+---
+
+## requirements.txt vs pyproject.toml
+
+### requirements.txt のみ使う場合
+
+**メリット**:
+- シンプル
+- 既存のワークフローと互換
+
+**デメリット**:
+- 本番/開発環境を分離できない
+- 厳密なロックファイルがない
+
+```bash
+# 使い方
+uv venv
+uv pip install -r requirements.txt
+uv pip freeze > requirements.txt  # 更新
+```
+
+### pyproject.toml を使う場合
+
+**メリット**:
+- 本番/開発環境を分離
+- `uv.lock`で完全な再現性
+- メタデータも管理
+
+**デメリット**:
+- 初期セットアップに少し手間
+
+```bash
+# 使い方
+uv add pandas           # 自動でpyproject.tomlとuv.lock更新
+uv sync                 # 環境を同期
+```
+
+### 移行方法
+
+```bash
+# requirements.txt → pyproject.toml
+uv init
+uv add --requirements requirements.txt
+
+# これでpyproject.tomlとuv.lockが生成される
+```
+
+---
+
+## Docker環境での使用
+
+### Dockerfile例（本番環境）
+
+```dockerfile
+FROM python:3.11-slim
+
+# uvをインストール
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# 依存関係ファイルをコピー
+COPY pyproject.toml uv.lock ./
+
+# 本番用依存関係のみインストール
+RUN uv sync --no-dev --frozen
+
+# アプリケーションコードをコピー
+COPY . .
+
+CMD ["uv", "run", "python", "main.py"]
+```
+
+### docker-compose.yml例（開発環境）
+
+```yaml
+version: '3.8'
+
+services:
+  app:
+    image: python:3.11
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: bash -c "pip install uv && uv sync && uv run python main.py"
+```
 
 ---
 
 ## 環境変数
 
-### よく使う環境変数
+uvの動作は環境変数で細かくカスタマイズできます。
+
+### 主要な環境変数
+
 ```bash
 # uvのデータディレクトリを変更
 export UV_CACHE_DIR=~/.cache/uv
@@ -437,63 +779,149 @@ export UV_PYTHON_INSTALL_DIR=~/.local/share/uv/python
 
 # 並列ダウンロード数を制限
 export UV_CONCURRENT_DOWNLOADS=4
+
+# オフラインモード（キャッシュのみ使用）
+export UV_OFFLINE=1
+
+# インデックスURLを変更（プライベートリポジトリなど）
+export UV_INDEX_URL=https://pypi.example.com/simple
+
+# 追加のインデックスURL
+export UV_EXTRA_INDEX_URL=https://pypi.example.com/simple
+
+# システムのPythonを使用
+export UV_SYSTEM_PYTHON=1
+
+# 詳細ログを有効化
+export UV_VERBOSE=1
 ```
+
+### デフォルトのディレクトリ
+
+**Linux/macOS**:
+- キャッシュ: `~/.cache/uv`
+- データ: `~/.local/share/uv`
+- ツール: `~/.local/share/uv/tools`
+- Python: `~/.local/share/uv/python`
+
+**Windows**:
+- キャッシュ: `%LOCALAPPDATA%\uv\cache`
+- データ: `%APPDATA%\uv\data`
+- ツール: `%APPDATA%\uv\data\tools`
+- Python: `%APPDATA%\uv\data\python`
 
 ---
 
 ## トラブルシューティング
 
-### キャッシュのクリア
+### 問題: パッケージがインストールできない
+
 ```bash
 # キャッシュをクリア
 uv cache clean
 
-# 特定パッケージのキャッシュをクリア
-uv cache clean requests
+# 再インストール
+uv sync --reinstall
 ```
 
-### 詳細なログを表示
-```bash
-# 詳細モードで実行
-uv pip install requests -v
+### 問題: Pythonバージョンが見つからない
 
-# さらに詳細なログ
-uv pip install requests -vv
+```bash
+# 明示的にインストール
+uv python install 3.11.0
+
+# インストール済みを確認
+uv python list --only-installed
 ```
 
-### 設定の確認
-```bash
-# uvの設定を表示
-uv config
+### 問題: 依存関係の競合
 
-# システム情報を表示
-uv version --verbose
+```bash
+# 詳細情報を表示
+uv lock --verbose
+
+# 特定パッケージのバージョンを固定
+uv add "package==1.2.3"
+```
+
+### 問題: Jupyter Kernelが認識されない
+
+```bash
+# 仮想環境をアクティベートしてから登録
+source .venv/bin/activate
+python -m ipykernel install --user --name=project --display-name "Python (project)"
+
+# 確認
+jupyter kernelspec list
+```
+
+### 問題: .venvが古くなった
+
+```bash
+# 仮想環境を削除して再作成
+rm -rf .venv
+uv sync
 ```
 
 ---
 
 ## 参考リンク
 
-- [公式ドキュメント](https://docs.astral.sh/uv/)
-- [GitHub リポジトリ](https://github.com/astral-sh/uv)
-- [変更履歴](https://github.com/astral-sh/uv/releases)
+- 公式ドキュメント: https://docs.astral.sh/uv/
+- GitHub: https://github.com/astral-sh/uv
+- PyPI: https://pypi.org/project/uv/
 
 ---
 
 ## まとめ
 
-`uv`は、Pythonの開発環境を統一的かつ高速に管理できる強力なツールです。
+### uvを使うべき理由
 
-**主な利点:**
-- ⚡ pipより圧倒的に高速
-- 🔧 パッケージ管理、仮想環境、Pythonバージョン管理を統合
-- 📦 モダンな`pyproject.toml`ベースの管理
-- 🔒 `uv.lock`による再現可能な環境
-- 🛠️ CLIツールの隔離管理
+1. **圧倒的な速度**: pipの10〜100倍高速
+2. **オールインワン**: pyenv + venv + pip + poetry の機能を統合
+3. **完全な再現性**: `uv.lock`で依存関係を完全にロック
+4. **pip互換**: 既存のコマンドがそのまま使える
+5. **モダンな開発体験**: `uv run`、`uv add`などの便利コマンド
+6. **ツール管理**: グローバルCLIツールを隔離して管理
+7. **Pythonバージョン管理**: pyenvの代替として使用可能
 
-**推奨される使い方:**
-1. 新規プロジェクト: `uv init`でスタート
-2. 既存プロジェクト: `uv sync`で環境構築
-3. 日常開発: `uv run`でコマンド実行
-4. CLIツール: `uv tool install`または`uvx`で管理
+### 移行のススメ
+
+**従来のツールチェーンから移行**:
+```bash
+# 従来
+pyenv install 3.12.0
+pyenv local 3.12.0
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# uv
+uv venv --python 3.12.0
+uv pip install -r requirements.txt
+# または
+uv init && uv sync
+```
+
+たった1〜2コマンドで完結！
+
+### クイックリファレンス
+
+| カテゴリ | コマンド | 説明 |
+|---------|---------|------|
+| **プロジェクト** | `uv init` | プロジェクト初期化 |
+| | `uv add <pkg>` | パッケージ追加 |
+| | `uv sync` | 環境同期 |
+| | `uv run <cmd>` | コマンド実行 |
+| **仮想環境** | `uv venv` | 仮想環境作成 |
+| **パッケージ** | `uv pip install <pkg>` | インストール |
+| | `uv pip list` | 一覧表示 |
+| **ツール** | `uv tool install <tool>` | グローバルインストール |
+| | `uvx <tool>` | 一時実行 |
+| **Python** | `uv python install 3.12` | Pythonインストール |
+| | `uv python pin 3.12` | バージョン固定 |
+
+---
+
+**最終更新**: 2025-10-14
 
