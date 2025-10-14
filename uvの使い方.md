@@ -9,7 +9,8 @@
 6. [Jupyter Notebookとの連携](#jupyter-notebookとの連携)
 7. [チーム開発での運用](#チーム開発での運用)
 8. [pipとの対応表](#pipとの対応表)
-9. [トラブルシューティング](#トラブルシューティング)
+9. [uv pip vs uv add の比較](#uv-pip-vs-uv-add-の比較)
+10. [トラブルシューティング](#トラブルシューティング)
 
 ---
 
@@ -109,6 +110,14 @@ deactivate
 
 ### 3. パッケージのインストール
 
+> **⚠️ 重要な注意点**
+> 
+> `uv pip`コマンドは**pyproject.tomlやuv.lockを更新しません**。
+> これは従来のpip互換コマンドで、requirements.txtベースの既存プロジェクトや一時的な用途向けです。
+> 
+> **新規プロジェクトやチーム開発では、[プロジェクト管理](#プロジェクト管理)セクションの`uv add/remove`を使用してください。**
+> これらのコマンドはpyproject.tomlとuv.lockを自動更新し、チーム全体で環境を完全に再現できます。
+
 ```bash
 # 単一パッケージをインストール
 uv pip install pandas
@@ -130,6 +139,11 @@ uv pip install --upgrade pandas
 uv pip uninstall pandas
 ```
 
+**`uv pip`を使うべき場合:**
+- requirements.txtベースの既存プロジェクト
+- 一時的にパッケージを試したいとき
+- pyproject.tomlで管理していないプロジェクト
+
 ### 4. パッケージ一覧
 
 ```bash
@@ -146,6 +160,15 @@ uv pip show pandas
 ---
 
 ## プロジェクト管理
+
+> **💡 推奨される方法**
+> 
+> 新規プロジェクトやチーム開発では、このセクションの`uv add/remove`を使用することを強く推奨します。
+> `uv pip`とは異なり、これらのコマンドは：
+> - ✅ pyproject.tomlを自動更新
+> - ✅ uv.lockで依存関係を完全にロック
+> - ✅ チーム全体で同一環境を再現可能
+> - ✅ 本番/開発環境を明確に分離
 
 ### 新規プロジェクトの作成
 
@@ -169,8 +192,21 @@ uv init
 # 本番用パッケージを追加
 uv add pandas numpy
 
+# バージョンを指定して追加
+uv add "pandas==2.0.0"          # 完全一致
+uv add "pandas>=2.0.0"          # 最小バージョン
+uv add "pandas>=2.0.0,<3.0.0"   # バージョン範囲
+uv add "django>=4.2,<5.0"       # 範囲指定
+uv add "numpy~=1.24.0"          # 互換バージョン（1.24.x）
+
+# 複数パッケージをバージョン指定して追加
+uv add "pandas>=2.0" "numpy>=1.24" "requests>=2.31"
+
 # 開発用パッケージを追加
 uv add --dev pytest black ruff
+
+# 開発用パッケージもバージョン指定可能
+uv add --dev "pytest>=7.0,<8.0" "black>=23.0"
 
 # オプショナルグループを指定
 uv add --group docs sphinx
@@ -206,9 +242,14 @@ uv sync --no-dev
 ```bash
 # 既存のrequirements.txtがある場合
 
-# 方法1: requirements.txtからpyproject.tomlに変換
+# 方法1: requirements.txtからpyproject.tomlに変換（推奨）
 uv init
 uv add --requirements requirements.txt
+# → pyproject.tomlとuv.lockが自動生成される
+# （uv addは自動的にuv.lockも更新するため、明示的なuv lockは不要）
+
+# 念のためロックファイルを確認したい場合
+uv lock --check
 
 # 方法2: 直接インストール（pyproject.tomlなし）
 uv venv
@@ -718,6 +759,53 @@ uv add --requirements requirements.txt
 
 # これでpyproject.tomlとuv.lockが生成される
 ```
+
+---
+
+## uv pip vs uv add の比較
+
+### コマンドの違い
+
+| 項目 | `uv pip` | `uv add/remove` |
+|-----|----------|----------------|
+| **pyproject.toml更新** | ❌ しない | ✅ 自動更新 |
+| **uv.lock更新** | ❌ しない | ✅ 自動更新 |
+| **チーム共有** | ❌ 困難 | ✅ 簡単 |
+| **環境再現性** | ❌ 低い | ✅ 完全 |
+| **本番/開発分離** | ❌ できない | ✅ 可能 |
+| **使用場面** | 既存プロジェクト・一時用途 | 新規・チーム開発 |
+
+### 具体例
+
+```bash
+# ❌ uv pipを使った場合（非推奨）
+uv pip install pandas
+# → 他のメンバーが `uv sync` しても pandas はインストールされない
+# → pyproject.toml に記録されない
+# → チーム間で環境が一致しない可能性
+
+# ✅ uv addを使った場合（推奨）
+uv add pandas
+# → pyproject.toml に自動追加
+# → uv.lock に依存関係が記録
+# → 他のメンバーが `uv sync` すると同じバージョンがインストールされる
+# → チーム全体で環境が完全一致
+```
+
+### どちらを使うべきか
+
+**`uv add/remove`を使うべき場合（推奨）:**
+- ✅ 新規プロジェクト
+- ✅ チーム開発
+- ✅ 環境の再現性が重要
+- ✅ 本番と開発環境を分けたい
+- ✅ 長期メンテナンスするプロジェクト
+
+**`uv pip`を使ってもよい場合:**
+- requirements.txtベースの既存プロジェクト
+- 一時的な検証・実験
+- 個人用の使い捨てスクリプト
+- レガシープロジェクトとの互換性が必要
 
 ---
 
