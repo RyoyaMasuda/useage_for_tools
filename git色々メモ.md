@@ -14,7 +14,7 @@ git config user.name "ryoya-masuda-unirita"
 git config user.email "ryouya_masuda@unirita.co.jp"
 ```
 
-## SSH Config設定
+## 1つのPCで複数のGitHubアカウントを使い分けたいときのSSH Config設定
 
 `~/.ssh/config`ファイルに以下の設定を追加：
 
