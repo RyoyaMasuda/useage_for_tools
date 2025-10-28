@@ -31,39 +31,152 @@ Ruff v0.6.0でこの機能は安定版となり、デフォルトで有効にな
 extend-include = ["*.ipynb"]
 ```
 
-## VS Codeの設定 (`settings.json`)
+## VS Codeの設定 (`settings.json`) 詳細ガイド
 
-`settings.json`に必要な設定を追加することで、保存時の自動フォーマットや修正が有効になります。
+`settings.json`に必要な設定を追加することで、Ruffの強力な機能を最大限に活用できます。ここでは、設定項目を一つずつ詳しく解説します。
 
-### 保存時にフォーマット・修正・インポート整理をまとめて行う
+---
 
-以下の設定が最も一般的です。保存時にフォーマット、Lint修正、インポート整理がすべて自動で行われます。
+### 1. 保存時の自動実行（推奨設定）
 
-**Pythonファイル用:**
+以下の設定が最も一般的で強力です。ファイルを保存するたびに、**フォーマット → Lint修正 → インポート整理**が自動で実行されます。
+
 ```json
 {
   "[python]": {
+    // 1. 保存時にフォーマッターを実行する
     "editor.formatOnSave": true,
+
+    // 2. 保存時にコードアクション（修正や整理）を実行する
     "editor.codeActionsOnSave": {
+      // "Fix All" を実行し、Ruffのルールに基づいて問題を自動修正する
       "source.fixAll": "explicit",
+      // インポート文を自動で並べ替え、整理する
       "source.organizeImports": "explicit"
     },
+
+    // 3. PythonファイルのデフォルトフォーマッターとしてRuffを指定する
     "editor.defaultFormatter": "charliermarsh.ruff"
   }
 }
 ```
 
-**Jupyter Notebook用:**
+#### 設定項目の解説
+
+- `"[python]"`: この設定をPythonファイル（`.py`）にのみ適用します。
+- `"editor.formatOnSave": true`: ファイル保存時に、`defaultFormatter`として指定されたフォーマッターを実行します。
+- `"editor.defaultFormatter": "charliermarsh.ruff"`: VS CodeのデフォルトフォーマッターとしてRuffを指定します。これにより、`formatOnSave`がRuffをトリガーします。
+- `"editor.codeActionsOnSave"`: ファイル保存時に実行する「コードアクション」を指定します。
+  - `"source.fixAll": "explicit"`: Ruffが検出した、自動修正可能な問題をすべて修正します（未使用の変数削除など）。
+  - `"source.organizeImports": "explicit"`: `isort`と同様の機能で、インポート文をグループ化し、アルファベット順に並べ替えます。
+- `"explicit"`: この値は、VS Codeがアクションを明示的に実行することを示します。`true`でも動作しますが、`explicit`が公式に推奨されています。
+
+---
+
+### 2. 個別機能の設定例
+
+特定の機能だけを使いたい場合の設定例です。
+
+#### A. フォーマット機能だけを使いたい場合
+
 ```json
 {
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  }
+}
+```
+*`codeActionsOnSave`を設定しないことで、フォーマットのみが実行されます。*
+
+#### B. Lintの自動修正だけを使いたい場合
+
+```json
+{
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    },
+    // フォーマットは行わないので、defaultFormatterをnullに設定
+    "editor.defaultFormatter": null
+  }
+}
+```
+
+#### C. インポート整理だけを使いたい場合
+
+```json
+{
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  }
+}
+```
+
+---
+
+### 3. Jupyter Notebookでの設定
+
+Jupyter Notebook (`.ipynb`) ファイルに対しても同様の設定が可能です。設定のキーが少し異なります。
+
+```json
+{
+  // Notebookで保存時の自動フォーマットを有効化
   "notebook.formatOnSave.enabled": true,
+
+  // Notebookでの保存時コードアクション
   "notebook.codeActionsOnSave": {
     "notebook.source.fixAll": "explicit",
     "notebook.source.organizeImports": "explicit"
   },
+
+  // Notebook内のPythonセルでもRuffをフォーマッターとして指定
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff"
   }
+}
+```
+
+---
+
+### 4. 他のツールと組み合わせる場合
+
+#### Ruffで修正し、Blackでフォーマットする
+
+Ruffの高速な自動修正機能を利用しつつ、フォーマットは実績のある`Black`に任せる構成です。
+
+```json
+{
+  "[python]": {
+    // 保存時にBlackフォーマッターを実行
+    "editor.formatOnSave": true,
+    // 保存時にRuffで自動修正を実行
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    },
+    // デフォルトのフォーマッターをBlackに指定
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  }
+}
+```
+*この場合、Ruffは修正のみを行い、コードの整形はBlackが行います。*
+
+#### Ruffをリンターとして使い、isortでインポート整理する
+
+インポート整理をRuffではなく、従来の`isort`拡張機能に任せたい場合の設定です。
+
+```json
+{
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit", // Ruffの修正は有効
+      "source.organizeImports": "explicit" // isort拡張機能がこれを実行
+    }
+  },
+  // Ruff自身のインポート整理機能を無効化
+  "ruff.organizeImports": false
 }
 ```
 
