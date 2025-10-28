@@ -4,11 +4,11 @@
 
 ### 新規プロジェクト
 ```bash
-# 1. プロジェクト初期化
+# 1. プロジェクト初期化 (init(pythonバージョン指定)で作られるのは.python-versionとpyproject.toml)
 uv init --python 3.11 my-project
 cd my-project
 
-# 2. パッケージ追加
+# 2. パッケージ追加 (uv addの時点で.venv(仮想環境)が作られる。)
 uv add pandas numpy
 
 # 3. 環境同期（仮想環境自動作成 + 依存関係インストール）
@@ -66,6 +66,7 @@ uv init --python 3.11  # .python-versionが作成される
 ```bash
 uv init  # 新規プロジェクトの場合のみ
 uv add --requirements requirements.txt  # pyproject.tomlに変換
+# uv add -r requirements.txt  # でもいい
 uv sync
 ```
 
