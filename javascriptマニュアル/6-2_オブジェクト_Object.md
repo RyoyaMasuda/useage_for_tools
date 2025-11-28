@@ -1000,3 +1000,5 @@ console.log(person.address.city);      // '渋谷区'
 お疲れ様でした！次の章に進みましょう。
 
 
+
+
